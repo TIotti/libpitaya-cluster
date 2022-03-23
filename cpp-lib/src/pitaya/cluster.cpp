@@ -14,6 +14,10 @@
 #include <cpprest/json.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
+
+extern std::wstring to_ws(const std::string& key);
+extern std::string to_s(const std::wstring& text);
+
 using namespace pitaya;
 using namespace std;
 namespace json = web::json;
@@ -203,9 +207,9 @@ Cluster::RPC(const string& serverId,
     // TODO proper jaeger setup
     json::value metadata;
     metadata.object();
-    metadata[constants::kPeerIdKey] = json::value::string(_server.Id());
-    metadata[constants::kPeerServiceKey] = json::value::string(_server.Type());
-    string metadataStr = metadata.serialize();
+    metadata[to_ws(constants::kPeerIdKey).c_str()] = json::value::string(to_ws(_server.Id()));
+    metadata[to_ws(constants::kPeerServiceKey).c_str()] = json::value::string(to_ws(_server.Type()));
+    string metadataStr = to_s(metadata.serialize());
     req.set_metadata(metadataStr);
 
     ret = _rpcClient->Call(sv.value(), req);

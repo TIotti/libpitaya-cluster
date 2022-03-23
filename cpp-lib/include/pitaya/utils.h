@@ -52,5 +52,6 @@ inline void SetThreadName(const char* name, std::shared_ptr<spdlog::logger> log)
 
 } // namespace utils
 } // namespace pitaya
-
+extern std::wstring to_ws(const std::string& key);
+extern std::string to_s(const std::wstring& text);
 #endif // PITAYA_UTILS_H

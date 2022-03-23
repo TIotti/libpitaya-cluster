@@ -17,6 +17,10 @@
 #include <chrono>
 #include <cstdio>
 #include <cpprest/json.h>
+#ifdef WIN32
+#include<signal.h>
+
+#endif
 
 using namespace std;
 using namespace pitaya;
@@ -24,6 +28,10 @@ using namespace pitaya::service_discovery;
 using namespace pitaya::etcdv3_service_discovery;
 using namespace web;
 using boost::optional;
+extern std::string to_s(const std::wstring& text);
+extern std::wstring to_ws(const std::string& str);
+extern std::string to_utf8(const std::string& str);
+
 
 static char*
 ConvertToCString(const std::string& str)
@@ -41,10 +49,20 @@ static void (*gSignalHandler)() = nullptr;
 void
 FromPitayaServer(CServer* server, const pitaya::Server& pServer)
 {
-    server->id = ConvertToCString(pServer.Id());
-    server->type = ConvertToCString(pServer.Type());
-    server->metadata = ConvertToCString(pServer.Metadata());
-    server->hostname = ConvertToCString(pServer.Hostname());
+    std::ofstream ost;
+
+    ost.open("D://pitaya_dll.log", std::ios::out | std::ios::app);
+    ost << "======FromPitaya\nfrontend: " + pServer.IsFrontend();
+    ost << "\nid: " + pServer.Id();
+    ost << "\nhostname: " + pServer.Hostname();
+    ost << "\nmetadata: " + to_utf8(pServer.Metadata());
+    ost << "\ntype: " + pServer.Type();
+    ost.close();
+
+    server->id = ConvertToCString(to_utf8(pServer.Id()));
+    server->type = ConvertToCString(to_utf8(pServer.Type()));
+    server->metadata = ConvertToCString(to_utf8(pServer.Metadata()));
+    server->hostname = ConvertToCString(to_utf8(pServer.Hostname()));
     server->frontend = pServer.IsFrontend();
 }
 
@@ -86,7 +104,7 @@ ParseServerTypeFilters(std::vector<std::string>& serverTypeFilters, const char* 
                 gLogger->error("Server type filter elements should be of type string and not empty");
                 return false;
             }
-            serverTypeFilters.push_back(el.as_string());
+            serverTypeFilters.push_back(to_s(el.as_string()));
         }
         
         return true;
@@ -199,7 +217,7 @@ CServerToServer(CServer* sv)
     auto id = sv->id ? std::string(sv->id) : "";
     auto type = sv->type ? std::string(sv->type) : "";
     auto hostname = sv->hostname ? std::string(sv->hostname) : "";
-    auto metadata = sv->metadata ? std::string(sv->metadata) : "";
+    auto metadata = sv->metadata ? to_utf8(std::string(sv->metadata)) : "";
 
     auto s =
         pitaya::Server((Server::Kind)sv->frontend, id, type, hostname).WithRawMetadata(metadata);
@@ -230,7 +248,7 @@ SetLogLevel(LogLevel level)
 
 extern "C"
 {
-    bool tfg_pitc_InitializeWithGrpc(CGrpcConfig* grpcConfig,
+    __declspec(dllexport) bool __cdecl tfg_pitc_InitializeWithGrpc(CGrpcConfig* grpcConfig,
                                      CSDConfig* sdConfig,
                                      CServer* sv,
                                      LogLevel logLevel,
@@ -265,7 +283,7 @@ extern "C"
         }
     }
 
-    bool tfg_pitc_InitializeWithNats(CNATSConfig* nc,
+    __declspec(dllexport) bool __cdecl tfg_pitc_InitializeWithNats(CNATSConfig* nc,
                                      CSDConfig* sdConfig,
                                      CServer* sv,
                                      LogLevel logLevel,
@@ -304,26 +322,45 @@ extern "C"
         }
     }
 
-    bool tfg_pitc_GetServerById(const char* serverId, CServer* retServer)
+    __declspec(dllexport) bool __cdecl tfg_pitc_GetServerById(const char* serverId,
+                                                              CServer* retServer)
     {
         auto maybeServer = Cluster::Instance().GetServiceDiscovery().GetServerById(serverId);
 
         if (!maybeServer) {
             return false;
         }
-
+        
         pitaya::Server server = maybeServer.value();
+
+        std::ofstream ost;
+
+        ost.open("D://pitaya_dll.log", std::ios::out | std::ios::app);
+        ost << "frontend: " + server.IsFrontend();
+        ost << "\nid: " + server.Id();
+        ost << "\nhostname: " + server.Hostname();
+        ost << "\nmetadata: " + to_utf8(server.Metadata());
+        ost << "\ntype: " + server.Type();
+        ost.close();
+
         retServer->frontend = server.IsFrontend(); // FromPitayaServer(server);
         retServer->hostname = ConvertToCString(server.Hostname());
         retServer->id = ConvertToCString(server.Id());
-        retServer->metadata = ConvertToCString(server.Metadata());
+        retServer->metadata =
+            ConvertToCString(to_utf8(server.Metadata()));
         retServer->type = ConvertToCString(server.Type());
         return true;
     }
 
-    void tfg_pitc_FreeServer(CServer* cServer) { FreeServer(cServer); }
+    __declspec(dllexport) void __cdecl tfg_pitc_FreeServer(CServer* cServer)
+    {
+        FreeServer(cServer);
+    }
 
-    void tfg_pitc_Terminate() { pitaya::Cluster::Instance().Terminate(); }
+    __declspec(dllexport) void __cdecl tfg_pitc_Terminate()
+    {
+        pitaya::Cluster::Instance().Terminate();
+    }
 
     static bool SendResponseToManaged(MemoryBuffer** outBuf,
                                       const protos::Response& res,
@@ -345,7 +382,7 @@ extern "C"
         return true;
     }
 
-    bool tfg_pitc_SendPushToUser(const char* server_id,
+    __declspec(dllexport) bool __cdecl tfg_pitc_SendPushToUser(const char* server_id,
                                  const char* server_type,
                                  MemoryBuffer* memBuf,
                                  CPitayaError* retErr)
@@ -370,7 +407,7 @@ extern "C"
         return true;
     }
 
-    bool tfg_pitc_SendKickToUser(const char* serverId,
+    __declspec(dllexport) bool __cdecl tfg_pitc_SendKickToUser(const char* serverId,
                                  const char* serverType,
                                  MemoryBuffer* memBuf,
                                  CPitayaError* retErr)
@@ -395,7 +432,7 @@ extern "C"
         return true;
     }
 
-    bool tfg_pitc_RPC(const char* serverId,
+    __declspec(dllexport) bool __cdecl tfg_pitc_RPC(const char* serverId,
                       const char* route,
                       void* data,
                       int dataSize,
@@ -440,19 +477,22 @@ extern "C"
         return SendResponseToManaged(outBuf, res, retErr);
     }
 
-    void tfg_pitc_FreeMem(void* mem) { free(mem); }
+    __declspec(dllexport) void __cdecl tfg_pitc_FreeMem(void* mem) { free(mem); }
 
-    void* tfg_pitc_AllocMem(int sz) { return malloc(sz); }
+    __declspec(dllexport) void* __cdecl tfg_pitc_AllocMem(int sz) { return malloc(sz); }
 
-    void tfg_pitc_FreeMemoryBuffer(MemoryBuffer* buf)
+    __declspec(dllexport) void __cdecl tfg_pitc_FreeMemoryBuffer(MemoryBuffer* buf)
     {
         delete[] reinterpret_cast<uint8_t*>(buf->data);
         delete buf;
     }
 
-    void tfg_pitc_FreePitayaError(CPitayaError* err) { FreePitayaError(err); }
+    __declspec(dllexport) void __cdecl tfg_pitc_FreePitayaError(CPitayaError* err)
+    {
+        FreePitayaError(err);
+    }
 
-    void tfg_pitc_OnSignal(void (*signalHandler)())
+    __declspec(dllexport) void __cdecl tfg_pitc_OnSignal(void (*signalHandler)())
     {
         if (gLogger) {
             gLogger->info("Adding signal handler");
@@ -460,7 +500,9 @@ extern "C"
         gSignalHandler = signalHandler;
         signal(SIGINT, OnSignal);
         signal(SIGTERM, OnSignal);
+        #ifndef WIN32
         signal(SIGKILL, OnSignal);
+        #endif
     }
 
     struct CRpc
@@ -469,7 +511,7 @@ extern "C"
         void* tag;
     };
 
-    void tfg_pitc_FinishRpcCall(MemoryBuffer* mb, CRpc* crpc)
+    __declspec(dllexport) void __cdecl tfg_pitc_FinishRpcCall(MemoryBuffer* mb, CRpc* crpc)
     {
         auto rpc = reinterpret_cast<pitaya::Rpc*>(crpc->tag);
 
@@ -490,7 +532,7 @@ extern "C"
         delete crpc;
     }
 
-    CRpc* tfg_pitc_WaitForRpc()
+    __declspec(dllexport) CRpc* __cdecl tfg_pitc_WaitForRpc()
     {
         optional<Cluster::RpcData> rpcData = Cluster::Instance().WaitForRpc();
 
@@ -517,7 +559,8 @@ extern "C"
         return crpc;
     }
 
-    void* tfg_pitc_AddServiceDiscoveryListener(CServiceDiscoveryListener::ServerAddedOrRemovedCb cb,
+    __declspec(dllexport) void* __cdecl tfg_pitc_AddServiceDiscoveryListener(
+        CServiceDiscoveryListener::ServerAddedOrRemovedCb cb,
                                                void* user)
     {
         gLogger->info("Adding native service discovery listener");
@@ -526,7 +569,8 @@ extern "C"
         return listener;
     }
 
-    void tfg_pitc_RemoveServiceDiscoveryListener(service_discovery::Listener* listener)
+    __declspec(dllexport) void __cdecl tfg_pitc_RemoveServiceDiscoveryListener(
+        service_discovery::Listener* listener)
     {
         gLogger->info("Removing native service discovery listener");
         if (listener) {

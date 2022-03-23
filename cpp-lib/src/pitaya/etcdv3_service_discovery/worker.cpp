@@ -8,6 +8,12 @@
 #include <cpprest/json.h>
 #include <sstream>
 
+#ifdef WIN32
+#include <signal.h>
+#endif
+extern std::wstring to_ws(const std::string& key);
+extern std::string to_s(const std::wstring& text);
+
 using boost::optional;
 using std::string;
 using std::vector;
@@ -527,16 +533,16 @@ ServerAsJson(const Server& server)
 {
     json::value obj;
     obj.object();
-    obj["id"] = json::value::string(server.Id());
-    obj["type"] = json::value::string(server.Type());
+    obj[L"id"] = json::value::string(to_ws(server.Id()));
+    obj[L"type"] = json::value::string(to_ws(server.Type()));
     try {
-        obj["metadata"] = json::value::parse(server.Metadata());
+        obj[L"metadata"] = json::value::string(to_ws(server.Metadata()));
     } catch (const json::json_exception& exc) {
-        obj["metadata"] = json::value::string("");
+        obj[L"metadata"] = json::value::string(L"");
     }
-    obj["hostname"] = json::value::string(server.Hostname());
-    obj["frontend"] = json::value::boolean(server.IsFrontend());
-    return obj.serialize();
+    obj[L"hostname"] = json::value::string(to_ws(server.Hostname()));
+    obj[L"frontend"] = json::value::boolean(server.IsFrontend());
+    return to_s(obj.serialize());
 }
 
 optional<Server>
@@ -553,20 +559,20 @@ Worker::ParseServer(const string& jsonStr)
         bool frontend = false;
         std::string hostname, type, id, metadata;
 
-        if (jsonSrv.has_boolean_field("frontend")) {
-            frontend = jsonSrv["frontend"].as_bool();
+        if (jsonSrv.has_boolean_field(L"frontend")) {
+            frontend = jsonSrv[L"frontend"].as_bool();
         }
-        if (jsonSrv.has_string_field("type")) {
-            type = jsonSrv["type"].as_string();
+        if (jsonSrv.has_string_field(L"type")) {
+            type = to_s(jsonSrv[L"type"].as_string());
         }
-        if (jsonSrv.has_string_field("id")) {
-            id = jsonSrv["id"].as_string();
+        if (jsonSrv.has_string_field(L"id")) {
+            id = to_s(jsonSrv[L"id"].as_string());
         }
-        if (jsonSrv.has_object_field("metadata")) {
-            metadata = jsonSrv["metadata"].serialize();
+        if (jsonSrv.has_object_field(L"metadata")) {
+            metadata = to_s(jsonSrv[L"metadata"].serialize());
         }
-        if (jsonSrv.has_string_field("hostname")) {
-            hostname = jsonSrv["hostname"].as_string();
+        if (jsonSrv.has_string_field(L"hostname")) {
+            hostname = to_s(jsonSrv[L"hostname"].as_string());
         }
 
         if (id.empty() || type.empty()) {

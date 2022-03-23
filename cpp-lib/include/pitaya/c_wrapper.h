@@ -87,37 +87,38 @@ extern "C"
     typedef void (*CsharpFreeCb)(void*);
     typedef MemoryBuffer* (*RpcPinvokeCb)(MemoryBuffer*);
 
-    bool tfg_pitc_InitializeWithGrpc(CGrpcConfig* grpcConfig,
+    __declspec(dllexport) bool __cdecl tfg_pitc_InitializeWithGrpc(CGrpcConfig* grpcConfig,
                                      CSDConfig* sdConfig,
                                      CServer* sv,
                                      LogLevel logLevel,
                                      const char* logFile);
 
-    bool tfg_pitc_InitializeWithNats(CNATSConfig* nc,
+    __declspec(dllexport) bool __cdecl tfg_pitc_InitializeWithNats(CNATSConfig* nc,
                                      CSDConfig* sdConfig,
                                      CServer* sv,
                                      LogLevel logLevel,
                                      const char* logFile);
 
-    bool tfg_pitc_GetServerById(const char* serverId, CServer* retServer);
+    __declspec(dllexport) bool __cdecl tfg_pitc_GetServerById(const char* serverId,
+                                                              CServer* retServer);
 
-    void tfg_pitc_FreeServer(CServer* cServer);
+    __declspec(dllexport) void __cdecl tfg_pitc_FreeServer(CServer* cServer);
 
-    void tfg_pitc_Terminate();
+    __declspec(dllexport) void __cdecl tfg_pitc_Terminate();
 
-    bool tfg_pitc_RPC(const char* serverId,
+    __declspec(dllexport) bool __cdecl tfg_pitc_RPC(const char* serverId,
                       const char* route,
                       void* data,
                       int dataSize,
                       MemoryBuffer** outBuf,
                       CPitayaError* retErr);
 
-    bool tfg_pitc_SendKickToUser(const char* serverId,
+    __declspec(dllexport) bool __cdecl tfg_pitc_SendKickToUser(const char* serverId,
                                  const char* serverType,
                                  MemoryBuffer* memBuf,
                                  CPitayaError* retErr);
 
-    bool tfg_pitc_SendPushToUser(const char* server_id,
+    __declspec(dllexport) bool __cdecl tfg_pitc_SendPushToUser(const char* server_id,
                                  const char* server_type,
                                  MemoryBuffer* memBuf,
                                  CPitayaError* retErr);

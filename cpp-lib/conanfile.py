@@ -40,7 +40,7 @@ class PitayaCpp(ConanFile):
 
     def configure(self):
         if self.settings.os != 'Linux' and self.settings.os != 'Macos':
-            raise ConanInvalidConfiguration('%s is not supported' % self.settings.os)
+            print('%s might not be supported' % self.settings.os)
 
     def config_options(self):
         if self.settings.os != 'Macos':

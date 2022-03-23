@@ -6,6 +6,10 @@
 
 #include <cpprest/json.h>
 
+
+extern std::wstring to_ws(const std::string& key);
+extern std::string to_s(const std::wstring& text);
+
 namespace pitaya {
 namespace utils {
 
@@ -26,24 +30,25 @@ GetGrpcAddressFromServer(const Server& server)
 
         auto metadataObj = metadataJson.as_object();
 
-        auto hasHost = metadataObj.find(constants::kGrpcHostKey) != metadataObj.cend() &&
-                       metadataObj[constants::kGrpcHostKey].as_string() != "";
+        auto hasHost = metadataObj.find(to_ws(constants::kGrpcHostKey).c_str()) != metadataObj.cend() &&
+            metadataObj[to_ws(constants::kGrpcHostKey).c_str()].as_string() != L"";
 
         if (!hasHost) {
             throw PitayaException("Did not receive a host on server metadata");
         }
 
-        auto hasPort = metadataObj.find(constants::kGrpcPortKey) != metadataObj.cend() &&
-                       metadataObj[constants::kGrpcPortKey].as_string() != "";
+        auto hasPort =
+            metadataObj.find(to_ws(constants::kGrpcPortKey).c_str()) != metadataObj.cend() &&
+            metadataObj[to_ws(constants::kGrpcPortKey).c_str()].as_string() != L"";
 
         if (!hasPort) {
             throw PitayaException("Did not receive a port on server metadata");
         }
 
-        auto host = metadataObj[constants::kGrpcHostKey].as_string();
-        auto port = metadataObj[constants::kGrpcPortKey].as_string();
+        auto host = metadataObj[to_ws(constants::kGrpcHostKey).c_str()].as_string();
+        auto port = metadataObj[to_ws(constants::kGrpcPortKey).c_str()].as_string();
 
-        return host + ":" + port;
+        return to_s(host + L":" + port);
     } catch (const web::json::json_exception& exc) {
         throw PitayaException(
             fmt::format("Failed to parse metadata json from server: error = {}, json string = {}",
