@@ -72,6 +72,7 @@ NewErrorResponse(const std::string& errorCode, const std::string& msg)
     res.set_allocated_error(error);
     return res;
 }
+extern void WideCharCleanUp(std::string* str);
 
 protos::Response
 GrpcClient::Call(const pitaya::Server& target, const protos::Request& req)
@@ -82,12 +83,17 @@ GrpcClient::Call(const pitaya::Server& target, const protos::Request& req)
         std::lock_guard<decltype(_stubsForServers)> lock(_stubsForServers);
         if (_stubsForServers.Find(target.Id()) == _stubsForServers.end()) {
             auto msg = fmt::format(
-                "Cannot call server {}, since it is not added to the connections map", target.Id());
+                "Cannot call server {}, since it is not added to the connections map \nServers:", target.Id());
             _log->error(msg);
+			for (auto s = _stubsForServers.begin(); s != _stubsForServers.end(); ++s) {
+				_log->info("Server {}", s->first.c_str());
+			}
+			_log->flush();
             return NewErrorResponse(constants::kCodeInternalError, msg);
         } else {
             _log->debug("Found server on the connections map");
         }
+		_log->flush();
     }
 
     // The stub is contained in the map. We then retrieve it and call the desired RPC function.
@@ -97,8 +103,10 @@ GrpcClient::Call(const pitaya::Server& target, const protos::Request& req)
 
         protos::Response res;
         grpc::ClientContext context;
-        _log->debug("Making RPC call with {} milliseconds of timeout", _config.clientRpcTimeout.count());
+        _log->info("Making RPC call with {} milliseconds of timeout", _config.clientRpcTimeout.count());
         context.set_deadline(std::chrono::system_clock::now() + _config.clientRpcTimeout);
+		_log->info("Making RPC request with metadata {}", req.metadata());
+		_log->flush();
         auto status = stub->Call(&context, req, &res);
         
         if (!status.ok()) {
@@ -107,6 +115,7 @@ GrpcClient::Call(const pitaya::Server& target, const protos::Request& req)
             _log->error(msg);
             _log->error("Server details: id = {}, type = {}, hostname = {}, isFrontend = {}, metadata = {}",
                         target.Id(), target.Type(), target.Hostname(), target.IsFrontend(), target.Metadata());
+			_log->flush();
             if (status.error_code() == grpc::StatusCode::DEADLINE_EXCEEDED) {
                 return NewErrorResponse(constants::kCodeTimeout, msg);
             } else {

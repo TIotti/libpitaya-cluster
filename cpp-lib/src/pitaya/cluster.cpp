@@ -11,6 +11,8 @@
 #include "pitaya/protos/msg.pb.h"
 #include "pitaya/utils.h"
 
+#include <boost/algorithm/string/replace.hpp>
+
 #include <cpprest/json.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
@@ -78,6 +80,11 @@ Cluster::InitializeWithGrpc(GrpcConfig config,
                        loggerName));
 
     Initialize(server, serviceDiscovery, std::move(rpcServer), std::move(rpcClient), loggerName);
+	if (_log)
+	{
+		_log->info(">Initializing rpcClient with config {}/{}", sdConfig.endpoints.c_str(), sdConfig.etcdPrefix + "servers/metagame/");
+		_log->flush();
+	}
 }
 
 void
@@ -157,6 +164,7 @@ Cluster::RPC(const string& route, protos::Request& req, protos::Response& ret)
             return PitayaError(constants::kCodeNotFound, "no servers found for route: " + route);
         }
         pitaya::Server sv = pitaya::utils::RandomServer(servers);
+		_log->info("Trying RPC on server Hostname:{} , ID:{}, Metadata:{}", sv.Hostname(), sv.Id(), sv.Metadata());
         return RPC(sv.Id(), route, req, ret);
     } catch (PitayaException* e) {
         return PitayaError(constants::kCodeInternalError, e->what());
@@ -204,17 +212,21 @@ Cluster::RPC(const string& serverId,
         return PitayaError(constants::kCodeNotFound, "server not found");
     }
 
+	//sv.value().WithMetadata("stackInfo", "{\"clientVersion\":\">0.0.0, <4.0.0\",\"exclusive\":false,\"maintenance\":false,\"migration\":false}");
     // TODO proper jaeger setup
     json::value metadata;
     metadata.object();
     metadata[to_ws(constants::kPeerIdKey).c_str()] = json::value::string(to_ws(_server.Id()));
     metadata[to_ws(constants::kPeerServiceKey).c_str()] = json::value::string(to_ws(_server.Type()));
     string metadataStr = to_s(metadata.serialize());
+	_log->info("RPC request to server {} with parameters {} hostname:{} ", sv.value().Id(), sv.value().Metadata(), sv.value().Hostname());
+
     req.set_metadata(metadataStr);
 
     ret = _rpcClient->Call(sv.value(), req);
     if (ret.has_error()) {
         _log->error("Received error calling client rpc: {}", ret.error().msg());
+		_log->flush();
         return PitayaError(ret.error().code(), ret.error().msg());
     } else {
         _log->info("RPC to server {} succeeded", serverId);
@@ -242,7 +254,7 @@ Cluster::OnIncomingRpc(const protos::Request& req, Rpc* rpc)
         // TODO, FIXME: intead of incrementing the count to 2000 here,
         // solve this in a more elegant way.
         _waitingRpcsFinished = true;
-        _waitingRpcsSemaphore->NotifyAll(2000);
+        _waitingRpcsSemaphore->NotifyAll(5000);
     }
 }
 

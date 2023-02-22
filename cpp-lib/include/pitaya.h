@@ -9,6 +9,18 @@
 #include <string>
 #include <unordered_map>
 
+#ifdef WIN32
+typedef std::wstring String;
+extern std::wstring to_ws(const std::string& str);
+extern std::string to_s(const std::wstring& wstr);
+extern std::string to_utf8(const std::string& str);
+#else
+typedef std::string String;
+extern std::string to_ws(const std::string& str);
+extern std::string to_s(const std::string& wstr);
+extern std::string to_utf8(const std::string& str);
+#endif
+
 namespace pitaya {
 
 class Rpc
@@ -91,6 +103,8 @@ private:
     std::string _metadata;
     std::string _hostname;
     bool _frontend;
+
+
 };
 
 struct PitayaError

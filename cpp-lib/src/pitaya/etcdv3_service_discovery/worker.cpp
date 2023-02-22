@@ -595,6 +595,10 @@ Worker::AddListener(service_discovery::Listener* listener)
     std::lock_guard<decltype(_jobQueue)> lock(_jobQueue);
     _jobQueue.PushBack(Job::NewAddListener(listener));
     _semaphore.Notify();
+	if (_log)
+	{
+		_log->info("Discovery Listener successfully added in queue at {}!", _jobQueue.Size());
+	}
 }
 
 void

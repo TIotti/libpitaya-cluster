@@ -15,6 +15,8 @@
 // @@protoc_insertion_point(includes)
 #include <google/protobuf/port_def.inc>
 
+extern void WideCharCleanUp(std::string* str);
+
 PROTOBUF_PRAGMA_INIT_SEG
 namespace protos {
 constexpr Request::Request(
@@ -258,8 +260,14 @@ const char* Request::_InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::in
       // bytes metadata = 5;
       case 5:
         if (PROTOBUF_PREDICT_TRUE(static_cast<::PROTOBUF_NAMESPACE_ID::uint8>(tag) == 42)) {
-          auto str = _internal_mutable_metadata();
+          auto str = _internal_mutable_metadata();		  
           ptr = ::PROTOBUF_NAMESPACE_ID::internal::InlineGreedyStringParser(str, ptr, ctx);
+		  std::string sptr(ptr);
+		  WideCharCleanUp(&sptr);
+		  char* nptr = new char[sptr.size() + 1];
+		  memset(nptr, 0, sizeof(sptr.size() + 1));
+		  strcpy(nptr, &sptr[0]);
+		  ptr = nptr;
           CHK_(ptr);
         } else goto handle_unusual;
         continue;

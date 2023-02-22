@@ -42,7 +42,11 @@ Pitaya::Stub::Stub(const std::shared_ptr< ::grpc::ChannelInterface>& channel)
   {}
 
 ::grpc::Status Pitaya::Stub::Call(::grpc::ClientContext* context, const ::protos::Request& request, ::protos::Response* response) {
+#ifdef WIN32
+	return ::grpc::internal::BlockingUnaryCall< ::protos::Request, ::protos::Response, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_Call_, context, request, response);
+#else
   return ::grpc::internal::BlockingUnaryCall< ::protos::Request, ::protos::Response, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_Call_, context, request, response);
+#endif
 }
 
 void Pitaya::Stub::experimental_async::Call(::grpc::ClientContext* context, const ::protos::Request* request, ::protos::Response* response, std::function<void(::grpc::Status)> f) {

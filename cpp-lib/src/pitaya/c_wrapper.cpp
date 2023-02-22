@@ -31,6 +31,7 @@ using boost::optional;
 extern std::string to_s(const std::wstring& text);
 extern std::wstring to_ws(const std::string& str);
 extern std::string to_utf8(const std::string& str);
+extern void LogToFile(String msg);
 
 
 static char*
@@ -43,21 +44,13 @@ ConvertToCString(const std::string& str)
     return cString;
 }
 
-static std::shared_ptr<spdlog::logger> gLogger;
+//static std::shared_ptr<spdlog::logger> gLogger;
+//std::shared_ptr<spdlog::logger> _gLogger = gLogger;
 static void (*gSignalHandler)() = nullptr;
 
 void
 FromPitayaServer(CServer* server, const pitaya::Server& pServer)
-{
-    std::ofstream ost;
-
-    ost.open("D://pitaya_dll.log", std::ios::out | std::ios::app);
-    ost << "======FromPitaya\nfrontend: " + pServer.IsFrontend();
-    ost << "\nid: " + pServer.Id();
-    ost << "\nhostname: " + pServer.Hostname();
-    ost << "\nmetadata: " + to_utf8(pServer.Metadata());
-    ost << "\ntype: " + pServer.Type();
-    ost.close();
+{   
 
     server->id = ConvertToCString(to_utf8(pServer.Id()));
     server->type = ConvertToCString(to_utf8(pServer.Type()));
@@ -95,13 +88,13 @@ ParseServerTypeFilters(std::vector<std::string>& serverTypeFilters, const char* 
     try {
         json::value val = json::value::parse(serverTypeFiltersStr);
         if (!val.is_array()) {
-            gLogger->error("Server type filters should be a json array: {}", serverTypeFiltersStr);
+            //gLogger->error("Server type filters should be a json array: {}", serverTypeFiltersStr);
             return false;
         }
         
         for (const auto& el : val.as_array()) {
             if (!el.is_string() || el.as_string().empty()) {
-                gLogger->error("Server type filter elements should be of type string and not empty");
+                //gLogger->error("Server type filter elements should be of type string and not empty");
                 return false;
             }
             serverTypeFilters.push_back(to_s(el.as_string()));
@@ -109,7 +102,7 @@ ParseServerTypeFilters(std::vector<std::string>& serverTypeFilters, const char* 
         
         return true;
     } catch (const json::json_exception& exc) {
-        gLogger->error("Failed to parse serverTypeFilters: {}", exc.what());
+        //gLogger->error("Failed to parse serverTypeFilters: {}", exc.what());
         return false;
     }
 }
@@ -229,19 +222,19 @@ SetLogLevel(LogLevel level)
 {
     switch (level) {
         case LogLevel_Debug:
-            gLogger->set_level(spdlog::level::debug);
+            //gLogger->set_level(spdlog::level::debug);
             break;
         case LogLevel_Info:
-            gLogger->set_level(spdlog::level::info);
+            //gLogger->set_level(spdlog::level::info);
             break;
         case LogLevel_Warn:
-            gLogger->set_level(spdlog::level::warn);
+            //gLogger->set_level(spdlog::level::warn);
             break;
         case LogLevel_Error:
-            gLogger->set_level(spdlog::level::err);
+            //gLogger->set_level(spdlog::level::err);
             break;
         case LogLevel_Critical:
-            gLogger->set_level(spdlog::level::critical);
+            //gLogger->set_level(spdlog::level::critical);
             break;
     }
 }
@@ -255,7 +248,7 @@ extern "C"
                                      const char* logFile)
     {
         if (!spdlog::get("c_wrapper")) {
-            gLogger = CreateLogger(logFile);
+            //gLogger = CreateLogger(logFile);
         }
         SetLogLevel(logLevel);
         Server server = CServerToServer(sv);
@@ -271,6 +264,12 @@ extern "C"
         }
 
         try {
+			/*if (gLogger)
+			{
+				gLogger->info("Using ServiceConfig: {} -> {}", serviceDiscoveryConfig.endpoints, serviceDiscoveryConfig.etcdPrefix);
+				gLogger->flush();
+			}*/
+			
             Cluster::Instance().InitializeWithGrpc(grpcConfig->ToConfig(),
                                                    serviceDiscoveryConfig,
                                                    bindingStorageConfig.ToConfig(),
@@ -278,7 +277,7 @@ extern "C"
                                                    "c_wrapper");
             return true;
         } catch (const PitayaException& exc) {
-            gLogger->error("Failed to create cluster instance: {}", exc.what());
+			//if (gLogger) gLogger->error("Failed to create cluster instance: {}", exc.what());
             return false;
         }
     }
@@ -292,7 +291,7 @@ extern "C"
         using std::chrono::milliseconds;
 
         if (!spdlog::get("c_wrapper")) {
-            gLogger = CreateLogger(logFile);
+            //gLogger = CreateLogger(logFile);
         }
         SetLogLevel(logLevel);
         auto natsCfg = NatsConfig(nc->addr ? std::string(nc->addr) : "",
@@ -317,7 +316,7 @@ extern "C"
                                                    "c_wrapper");
             return true;
         } catch (const PitayaException& exc) {
-            gLogger->error("Failed to create cluster instance: {}", exc.what());
+            //gLogger->error("Failed to create cluster instance: {}", exc.what());
             return false;
         }
     }
@@ -440,7 +439,7 @@ extern "C"
                       CPitayaError* retErr)
     {
         if (serverId == NULL || route == NULL || retErr == NULL) {
-            gLogger->error("Received null arguments on tfg_pic_RPC");
+            //gLogger->error("Received null arguments on tfg_pic_RPC");
             retErr->code = ConvertToCString(constants::kCodeInternalError);
             retErr->msg = ConvertToCString("Received NULL arguments on tfg_pitc_RPC");
             return false;
@@ -450,9 +449,11 @@ extern "C"
         assert(route && "route should not be null");
         assert((data || (!data && dataSize == 0)) && "data len should be 0 if data is null");
 
+		std::string str = std::string(reinterpret_cast<char*>(data), dataSize);
+
         auto msg = new protos::Msg();
         msg->set_type(protos::MsgType::MsgRequest);
-        msg->set_data(std::string(reinterpret_cast<char*>(data), dataSize));
+        msg->set_data(str);
         msg->set_route(route);
 
         protos::Request req;
@@ -461,17 +462,28 @@ extern "C"
 
         protos::Response res;
 
-        auto err = (!serverId || strlen(serverId) == 0)
-                       ? Cluster::Instance().RPC(route, req, res)
-                       : Cluster::Instance().RPC(serverId, route, req, res);
+		
+
+		boost::optional <pitaya::PitayaError> err;
+		if (!serverId || strlen(serverId) == 0)
+		{
+			err = Cluster::Instance().RPC(route, req, res);
+			LogToFile(to_ws("Trying call " + msg->route() + " with data " + msg->data() + "\n data:" + str + "\n metadata:" + req.metadata()));
+		}
+		else
+		{
+			err = Cluster::Instance().RPC(serverId, route, req, res);
+			LogToFile(to_ws("Trying call " + msg->route() + " on SERVERID " + serverId + " with data " + msg->data() + "\n data:" + str + "\n metadata:" + req.metadata()));
+		}
+                      
 
         if (err) {
             retErr->code = ConvertToCString(err->code);
             retErr->msg = ConvertToCString(err->msg);
-            gLogger->error("received error on RPC: {}: {}", retErr->code, retErr->msg);
+            //gLogger->error("received error on RPC: {}: {}", retErr->code, retErr->msg);
             return false;
         } else {
-            gLogger->debug("received message on RPC: {}", res.data());
+            //gLogger->debug("received message on RPC: {}", res.data());
         }
 
         return SendResponseToManaged(outBuf, res, retErr);
@@ -494,9 +506,9 @@ extern "C"
 
     __declspec(dllexport) void __cdecl tfg_pitc_OnSignal(void (*signalHandler)())
     {
-        if (gLogger) {
+        /*if (gLogger) {
             gLogger->info("Adding signal handler");
-        }
+        }*/
         gSignalHandler = signalHandler;
         signal(SIGINT, OnSignal);
         signal(SIGTERM, OnSignal);
@@ -549,7 +561,7 @@ extern "C"
         bool success = rpcData->req.SerializeToArray(reqBuffer->data, size);
         if (!success) {
             // TODO: send in response?
-            gLogger->error("failed to serialize protobuf request!");
+            //gLogger->error("failed to serialize protobuf request!");
         }
 
         CRpc* crpc = new CRpc();
@@ -563,21 +575,25 @@ extern "C"
         CServiceDiscoveryListener::ServerAddedOrRemovedCb cb,
                                                void* user)
     {
-        gLogger->info("Adding native service discovery listener");
+        //gLogger->info("Adding native service discovery listener");
         auto listener = new CServiceDiscoveryListener(cb, user);
         Cluster::Instance().AddServiceDiscoveryListener(listener);
         return listener;
     }
 
+	static int removeStackCount = 0;
+
     __declspec(dllexport) void __cdecl tfg_pitc_RemoveServiceDiscoveryListener(
         service_discovery::Listener* listener)
     {
-        gLogger->info("Removing native service discovery listener");
-        if (listener) {
+		//return;
+        //gLogger->info("Removing native service discovery listener");
+		//gLogger->flush();
+        if (listener) {			
             Cluster::Instance().RemoveServiceDiscoveryListener(listener);
             delete listener;
         } else {
-            gLogger->warn("Received a null listener");
+            //gLogger->warn("Received a null listener");
         }
     }
 }

@@ -8,6 +8,11 @@
 #include <string>
 #include <thread>
 
+#ifdef WIN32
+#include <windows.h>
+extern std::wstring to_ws(const std::string& str);
+#endif
+
 namespace pitaya {
 namespace utils {
 
@@ -28,6 +33,7 @@ bool ParseEtcdKey(const std::string& key,
 std::shared_ptr<spdlog::logger> CloneLoggerOrCreate(const char* loggerNameToClone,
                                                     const char* loggerName);
 
+
 inline void SetThreadName(const char* name, std::shared_ptr<spdlog::logger> log)
 {
 #ifdef linux
@@ -43,7 +49,12 @@ inline void SetThreadName(const char* name, std::shared_ptr<spdlog::logger> log)
         log->error("Failed to set thread name");
     }
 #elif _WIN32
-    log->warn("Not setting thread id, not implemented on windows yet");
+	log->debug("Setting thread name for windows to {}", name);
+	HRESULT hr = SetThreadDescription(GetCurrentThread(), to_ws(name).c_str());
+	if (FAILED(hr))
+	{
+		log->error("UNABLE TO SET WINDOWS THREAD NAME TO {}", name);
+}
 #else
     log->debug("Setting thread name for macosx to {}", name);
     pthread_setname_np(name);
